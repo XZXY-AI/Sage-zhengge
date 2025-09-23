@@ -89,7 +89,12 @@ async def lifespan(app: FastAPI):
     await cleanup_system()
 
 # 设置配置文件路径环境变量
-os.environ['SAGE_MCP_CONFIG_PATH'] = server_args.mcp_config
+# 如果是相对路径，转换为相对于项目根目录的绝对路径
+if not os.path.isabs(server_args.mcp_config):
+    mcp_config_path = os.path.join(project_root, server_args.mcp_config)
+else:
+    mcp_config_path = server_args.mcp_config
+os.environ['SAGE_MCP_CONFIG_PATH'] = mcp_config_path
 # FastAPI 应用
 app = FastAPI(
     title="Sage Stream Service",
