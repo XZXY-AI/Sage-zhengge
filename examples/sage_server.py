@@ -40,9 +40,9 @@ from sagents.context.session_context import SessionStatus,get_session_context
 import argparse
 
 parser = argparse.ArgumentParser(description="Sage Stream Service")
-parser.add_argument("--default_llm_api_key", required=True, help="默认LLM API Key")
-parser.add_argument("--default_llm_api_base_url", required=True, help="默认LLM API Base")
-parser.add_argument("--default_llm_model_name", required=True, help="默认LLM API Model")
+parser.add_argument("--default_llm_api_key", default="2a3981750a3a4110b25296b6c064c99a", help="默认LLM API Key")
+parser.add_argument("--default_llm_api_base_url", default="https://openai-api-aiapp-usest.openai.azure.com/openai/deployments/gpt-4.1/chat/completions?api-version=2025-01-01-preview", help="默认LLM API Base")
+parser.add_argument("--default_llm_model_name", default="gpt-4.1", help="默认LLM API Model")
 parser.add_argument("--default_llm_max_tokens", default=4096, type=int, help="默认LLM API Max Tokens")
 parser.add_argument("--default_llm_temperature", default=0.3, type=float, help="默认LLM API Temperature")
 parser.add_argument("--host", default="0.0.0.0", help="Server Host")
