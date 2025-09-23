@@ -41,12 +41,12 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Sage Stream Service")
 parser.add_argument("--default_llm_api_key", default="2a3981750a3a4110b25296b6c064c99a", help="默认LLM API Key")
-parser.add_argument("--default_llm_api_base_url", default="https://openai-api-aiapp-usest.openai.azure.com/openai/deployments/gpt-4.1/chat/completions?api-version=2025-01-01-preview", help="默认LLM API Base")
+parser.add_argument("--default_llm_api_base_url", default="https://openai-api-aiapp-usest.openai.azure.com/", help="默认LLM API Base")
 parser.add_argument("--default_llm_model_name", default="gpt-4.1", help="默认LLM API Model")
 parser.add_argument("--default_llm_max_tokens", default=4096, type=int, help="默认LLM API Max Tokens")
 parser.add_argument("--default_llm_temperature", default=0.3, type=float, help="默认LLM API Temperature")
 parser.add_argument("--host", default="0.0.0.0", help="Server Host")
-parser.add_argument("--port", default=8001, type=int, help="Server Port")
+parser.add_argument("--port", default=8000, type=int, help="Server Port")
 
 parser.add_argument("--mcp-config", default="mcp_setting.json", help="MCP配置文件路径")
 parser.add_argument("--workspace", default="sage_demo_workspace", help="工作空间目录")
@@ -346,10 +346,19 @@ async def initialize_system(server_args):
     try:
         # 初始化模型客户端
         if server_args.default_llm_api_key:
-            default_model_client = OpenAI(
-                api_key=server_args.default_llm_api_key,
-                base_url=server_args.default_llm_api_base_url
-            )
+            # 检查是否为 Azure OpenAI
+            if "azure.com" in server_args.default_llm_api_base_url:
+                from openai import AzureOpenAI
+                default_model_client = AzureOpenAI(
+                    api_key=server_args.default_llm_api_key,
+                    azure_endpoint=server_args.default_llm_api_base_url,
+                    api_version="2025-01-01-preview"
+                )
+            else:
+                default_model_client = OpenAI(
+                    api_key=server_args.default_llm_api_key,
+                    base_url=server_args.default_llm_api_base_url
+                )
             default_model_client.model = server_args.default_llm_model_name
             logger.info(f"默认模型客户端初始化成功: {server_args.default_llm_model_name}")
         else:
@@ -532,10 +541,21 @@ async def stream_chat(request: StreamRequest):
     # 取决于是否需要自定义模型以及 agent 的system prefix ，以及对tool 的工具是否有限制
     if request.llm_model_config or request.system_prefix or request.available_tools:
         # 根据model config 初始化新的模型客户端
-        model_client = OpenAI(
-            api_key=request.llm_model_config.get('api_key', server_args.default_llm_api_key),
-            base_url=request.llm_model_config.get('base_url', server_args.default_llm_api_base_url),
-        )
+        base_url = request.llm_model_config.get('base_url', server_args.default_llm_api_base_url)
+        api_key = request.llm_model_config.get('api_key', server_args.default_llm_api_key)
+        
+        if "azure.com" in base_url:
+            from openai import AzureOpenAI
+            model_client = AzureOpenAI(
+                api_key=api_key,
+                azure_endpoint=base_url,
+                api_version="2025-01-01-preview"
+            )
+        else:
+            model_client = OpenAI(
+                api_key=api_key,
+                base_url=base_url
+            )
         llm_model_config = {
             'model': request.llm_model_config.get('model', server_args.default_llm_model_name),
             'max_tokens': int(request.llm_model_config.get('max_tokens', server_args.default_llm_max_tokens)),
