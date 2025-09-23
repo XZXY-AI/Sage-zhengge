@@ -27,10 +27,27 @@ import uvicorn
 
 # 添加 Sage 项目路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(project_root)
+sys.path.insert(0, project_root)
 print(f"Project root: {project_root}")
 
-from sagents.sagents import SAgent
+# 确保 sagents 目录被识别为包
+sagents_path = os.path.join(project_root, 'sagents')
+if not os.path.exists(os.path.join(sagents_path, '__init__.py')):
+    with open(os.path.join(sagents_path, '__init__.py'), 'w') as f:
+        f.write('')
+
+# 调试导入
+try:
+    from sagents.sagents import SAgent
+except ImportError as e:
+    print(f"Import error: {e}")
+    print(f"Python path: {sys.path}")
+    print(f"Current directory: {os.getcwd()}")
+    print(f"Project root: {project_root}")
+    # 检查文件是否存在
+    sagents_file = os.path.join(project_root, 'sagents', 'sagents.py')
+    print(f"Sagents file exists: {os.path.exists(sagents_file)}")
+    raise
 from sagents.tool.tool_manager import ToolManager
 from sagents.tool.tool_proxy import ToolProxy
 from sagents.utils.logger import logger

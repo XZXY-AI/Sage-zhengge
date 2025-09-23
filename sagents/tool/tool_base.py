@@ -65,6 +65,8 @@ class ToolBase:
                         param_info["type"] = "object"
                     elif type_name == "list":
                         param_info["type"] = "array"
+                        # 为数组类型添加 items 字段
+                        param_info["items"] = {"type": "string"}
                 
                 # Get parameter description from parsed docstring
                 param_desc = ""
