@@ -26,8 +26,9 @@ from pydantic import BaseModel
 import uvicorn
 
 # 添加 Sage 项目路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-print(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(project_root)
+print(f"Project root: {project_root}")
 
 from sagents.sagents import SAgent
 from sagents.tool.tool_manager import ToolManager
