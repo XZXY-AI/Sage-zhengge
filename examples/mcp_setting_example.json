@@ -1,9 +1,12 @@
 {
     "mcpServers": {
-        "sage_mcp_hub": {
-            "sse_url":"http://sage_mcp_hub:20042/sse",
-            "disabled": false,
-            "api_key": "sk-hub-*****-hEZgIf9leyswgqPw8HI"
+        "serper_web_search":{
+            "sse_url":"http://127.0.0.1:34011/sse",
+            "disabled": false
+        },
+        "match_data_service": {
+            "sse_url": "http://127.0.0.1:34012/sse",
+            "disabled": false
         }
     }
 }

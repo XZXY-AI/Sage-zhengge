@@ -15,7 +15,7 @@ import asyncio
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Union
 from dataclasses import dataclass
-
+import time
 # 抑制Streamlit的ScriptRunContext警告（在bare mode下可以忽略）
 import warnings
 import logging
@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore", message=".*missing ScriptRunContext.*")
 logging.getLogger("streamlit.runtime.scriptrunner_utils.script_run_context").setLevel(logging.ERROR)
 
 import streamlit as st
-from openai import OpenAI
+from openai import OpenAI, AzureOpenAI
 
 # 设置页面配置 - 必须在任何其他streamlit调用之前
 st.set_page_config(
@@ -75,7 +75,8 @@ class ComponentManager:
         self.preset_available_workflows = None
         self.preset_available_tools = None
         self.preset_max_loop_count = None
-        
+        self.use_multi_agent =False
+        self.use_deepthink =False
         if preset_running_config and os.path.exists(preset_running_config):
             try:
                 with open(preset_running_config, 'r', encoding='utf-8') as f:
@@ -121,7 +122,23 @@ class ComponentManager:
                     elif "maxLoopCount" in self.preset_config_dict:
                         self.preset_max_loop_count = self.preset_config_dict['maxLoopCount']
                         logger.debug(f"使用预设maxLoopCount: {self.preset_max_loop_count}")
-                        
+                    
+                    # 设置self.use_multi_agent
+                    if "multi_agent" in self.preset_config_dict:
+                        self.use_multi_agent = self.preset_config_dict['multi_agent']
+                        logger.debug(f"使用预设 multi_agent: {self.use_multi_agent}")
+                    elif "multiAgent" in self.preset_config_dict:
+                        self.use_multi_agent = self.preset_config_dict['multiAgent']
+                        logger.debug(f"使用预设multiAgent: {self.use_multi_agent}")                        
+                    
+                    # 设置deepthink
+                    if "deep_thinking" in self.preset_config_dict:
+                        self.use_deepthink = self.preset_config_dict['deep_thinking']
+                        logger.debug(f"使用预设 deep_thinking: {self.use_deepthink}")
+                    elif "deepThinking" in self.preset_config_dict:
+                        self.use_deepthink = self.preset_config_dict['deepThinking']
+                        logger.debug(f"使用预设 deepThinking: {self.use_deepthink}")
+                    
             except Exception as e:
                 logger.warning(f"加载预设配置失败: {e}")
                 self.preset_config_dict = {}
@@ -181,13 +198,42 @@ class ComponentManager:
         """初始化模型"""
         logger.debug(f"初始化模型，base_url: {self.base_url}")
         try:
+            # Azure 处理逻辑
+            if "azure.com" in self.base_url:
+                logger.info("检测到 Azure 配置，使用 AzureOpenAI 客户端")
+                return AzureOpenAI(
+                    api_key=self.api_key,
+                    azure_endpoint=self.base_url,
+                    api_version="2025-01-01-preview"
+                )
+            
+            # vLLM 处理逻辑 - 支持工具调用和流式响应
+            if ":8000" in self.base_url or "vllm" in self.base_url.lower():
+                logger.info("检测到 vLLM 配置，使用 OpenAI 兼容模式（支持工具调用）")
+                client = OpenAI(
+                    api_key=self.api_key or "token-abc123",  # vLLM 可以使用任意 token
+                    base_url=self.base_url
+                )
+                # 为 vLLM 客户端添加默认的 chat_template_kwargs
+                client._default_extra_body = {"chat_template_kwargs": {"enable_thinking": False}}
+                return client
+            
+            # Ollama 处理逻辑
+            if ":11434" in self.base_url or "ollama" in self.base_url.lower():
+                logger.info("检测到 Ollama 配置，使用 OpenAI 兼容模式")
+                return OpenAI(
+                    api_key="ollama",  # Ollama 不需要真实的 API key
+                    base_url=self.base_url + "/v1"  # Ollama OpenAI 兼容端点
+                )
+
+            # 默认 OpenAI 兼容客户端
             return OpenAI(
                 api_key=self.api_key,
                 base_url=self.base_url
             )
         except Exception as e:
             logger.error(f"模型初始化失败: {str(e)}")
-            raise 
+            raise SageException(f"无法连接到 API: {str(e)}")
     
     def _init_controller(self) -> SAgent:
         """初始化控制器"""
@@ -438,7 +484,8 @@ def generate_response(tool_manager: Union[ToolManager, ToolProxy], controller: S
     new_messages = streaming_handler.process_stream(
         st.session_state.inference_conversation.copy(),
         tool_manager,
-        session_id=None,
+        session_id=time.strftime("%Y-%m-%d_%H:%M:%S", time.localtime()) +'_'+str(uuid.uuid4())[:4]
+,
         use_deepthink=st.session_state.get('use_deepthink', True),
         use_multi_agent=st.session_state.get('use_multi_agent', True)
     )
@@ -496,8 +543,8 @@ def run_web_demo(api_key: str, model_name: str = None, base_url: str = None,
     use_multi_agent, use_deepthink = setup_ui(config)
     
     # 存储设置到会话状态
-    st.session_state.use_multi_agent = use_multi_agent
-    st.session_state.use_deepthink = use_deepthink
+    # st.session_state.use_multi_agent = use_multi_agent
+    # st.session_state.use_deepthink = use_deepthink
     
     # 初始化组件（只执行一次）
     if not st.session_state.components_initialized:
@@ -521,6 +568,8 @@ def run_web_demo(api_key: str, model_name: str = None, base_url: str = None,
                 st.session_state.component_manager = component_manager
                 st.session_state.components_initialized = True
                 st.session_state.config_updated = True  # 标记配置已更新
+                st.session_state.use_multi_agent = component_manager.use_multi_agent
+                st.session_state.use_deepthink = component_manager.use_deepthink
             st.success("系统初始化完成！")
             # 打印已注册工具，便于调试
             print("已注册工具：", [t['name'] for t in tool_manager.list_tools_simplified()])

@@ -157,11 +157,11 @@ class AgentBase(ABC):
                 messages=serializable_messages,
                 stream=True,
                 stream_options={"include_usage": True},
-                extra_body={
-                    "chat_template_kwargs": {"enable_thinking": False},
-                    "enable_thinking":False,
-                    "thinking":{'type':"disabled"}
-                },
+                # extra_body={
+                #     "chat_template_kwargs": {"enable_thinking": False},
+                #     "enable_thinking":False,
+                #     "thinking":{'type':"disabled"}
+                # },
                 **final_config
             )
             # 直接yield chunks，不再收集用于日志记录

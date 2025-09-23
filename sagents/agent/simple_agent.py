@@ -45,14 +45,19 @@ class SimpleAgent(AgentBase):
 """
         self.TASK_COMPLETE_PROMPT_TEMPLATE = """你要根据历史的对话以及用户的请求，判断是否需要中断执行任务。
 
-## 中断执行任务判断规则
+## 是否中断执行任务判断规则
 1. 中断执行任务：
   - 当你认为对话过程中，已有的回答结果已经满足回答用户的请求且不需要做更多的回答或者行动时，需要判断中断执行任务。
   - 当你认为对话过程中，发生了异常情况，并且尝试了两次后，仍然无法继续执行任务时，需要判断中断执行任务。
   - 当对话过程中，需要用户的确认或者输入时，需要判断中断执行任务。
+
 2. 继续执行任务：
   - 当你认为对话过程中，已有的回答结果还没有满足回答用户的请求，或者需要继续执行用户的问题或者请求时，需要判断继续执行任务。
   - 当完成工具调用，但未进行工具调用的结果进行文字描述时，需要判断继续执行任务。因为用户看不到工具执行的结果。
+  - 当对话中，Assistant AI 最后表达要继续做一些其他的事情或者继续分析其他的内容，例如出现（等待工具调用，请稍等，等待生成，接下来，我将调用）等表达时，则判断继续执行任务。
+
+## 输出内容一致对齐逻辑
+1. 如果reason 是等待工具调用，则task_interrupted是false
 
 ## 用户的对话历史以及新的请求的执行过程
 {messages}
@@ -60,12 +65,18 @@ class SimpleAgent(AgentBase):
 输出格式：
 ```json
 {{
-    "task_interrupted": true,
-    "reason": "任务完成"
+    "reason": "任务完成",
+    "task_interrupted": true
 }}
-
-reason尽可能简单，最多20个字符
 ```
+或者
+```json
+{{
+    "reason": "等待工具调用",
+    "task_interrupted": false
+}}
+```
+reason尽可能简单，最多20个字符
 """
 
         self.agent_custom_system_prefix = """\n
@@ -86,7 +97,7 @@ reason尽可能简单，最多20个字符
 4. 禁止输出”我将结束本次会话“这种显性表达，而是要根据对话，询问后续的问题或者需求。如果没有后续的问题或者需求，不输出其他额外的任何内容。
 """
         # 最大循环次数常量
-        self.max_loop_count = 10
+        self.max_loop_count = 50
         self.agent_name = "SimpleAgent"
         self.agent_description = """SimpleAgent: 简单智能体，负责无推理策略的直接任务执行，比ReAct策略更快速。
 适用于不需要推理或早期处理的任务。"""
@@ -238,11 +249,13 @@ reason尽可能简单，最多20个字符
             # 获取可用工具，只提取工具名称
             available_tools = tool_manager.list_tools_simplified()
             
-            tool_names = [tool['name'] for tool in available_tools] if available_tools else []
+            # tool_names = [tool['name'] for tool in available_tools] if available_tools else []
+            tool_names = ['tool_name: '+tool['name']+'\n'+"工具描述： "+tool['description']+"\n" for tool in available_tools] if available_tools else []
+            
             if len(tool_names) <= 10:
                 logger.info(f"SimpleAgent: 可用工具数量小于等于9个，直接返回所有工具: {tool_names}")
                 return tool_names
-            available_tools_str = ", ".join(tool_names) if tool_names else '无可用工具'
+            available_tools_str = "\n ".join(tool_names) if tool_names else '无可用工具'
             
             # 准备消息
             clean_messages = MessageManager.convert_messages_to_dict_for_request(messages_input)
