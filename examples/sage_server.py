@@ -89,9 +89,19 @@ async def lifespan(app: FastAPI):
     await cleanup_system()
 
 # 设置配置文件路径环境变量
-# 如果是相对路径，转换为相对于项目根目录的绝对路径
+# 如果是相对路径，优先在当前目录查找，然后在项目根目录查找
 if not os.path.isabs(server_args.mcp_config):
-    mcp_config_path = os.path.join(project_root, server_args.mcp_config)
+    # 先检查当前目录
+    current_dir_path = os.path.join(os.getcwd(), server_args.mcp_config)
+    # 再检查项目根目录
+    project_root_path = os.path.join(project_root, server_args.mcp_config)
+    
+    if os.path.exists(current_dir_path):
+        mcp_config_path = current_dir_path
+    elif os.path.exists(project_root_path):
+        mcp_config_path = project_root_path
+    else:
+        mcp_config_path = current_dir_path  # 默认使用当前目录路径
 else:
     mcp_config_path = server_args.mcp_config
 os.environ['SAGE_MCP_CONFIG_PATH'] = mcp_config_path
