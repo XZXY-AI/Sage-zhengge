@@ -144,6 +144,8 @@ class SageStreamService:
             self.preset_system_prefix = self.preset_running_config['system_prefix']
         else:
             self.preset_system_prefix = "You are a helpful AI assistant."
+    
+
 
         # workspace 有可能是相对路径
         if workspace:
@@ -163,7 +165,7 @@ class SageStreamService:
     async def process_stream(self, messages, session_id=None, user_id=None, deep_thinking=None, 
                            max_loop_count=None, multi_agent=None,more_suggest=False,
                             system_context:Dict=None, 
-                           available_workflows: Dict=None):
+                           available_workflows: Dict=None, language: str = "zh"):
         """处理流式聊天请求"""
         logger.info(f"🚀 SageStreamService.process_stream 开始，会话ID: {session_id}")
         logger.info(f"📝 参数: deep_thinking={deep_thinking}, multi_agent={multi_agent}, messages_count={len(messages)}")
@@ -189,6 +191,8 @@ class SageStreamService:
                 system_context.update(self.preset_system_context)
             else:
                 system_context = self.preset_system_context
+
+        
         # 如果 self.preset_available_workflows 不是空，将self.preset_available_workflows 的内容，更新到 available_workflows，不是赋值
         if self.preset_available_workflows:
             if available_workflows:
@@ -486,6 +490,7 @@ class StreamRequest(BaseModel):
     llm_model_config: Optional[Dict[str, Any]] = None
     system_prefix: Optional[str] = None
     available_tools: Optional[List[str]] = None
+    language: Optional[str] = "zh"
 
 class ConfigRequest(BaseModel):
     api_key: str
@@ -645,6 +650,20 @@ async def stream_chat(request: StreamRequest):
             
             # 打印请求体内容
             logger.info(f"请求体内容: {request}")
+            # 如果使用了preset配置且有systemPrefix，根据language参数动态替换语言
+            if stream_service.preset_running_config and 'systemPrefix' in stream_service.preset_running_config:
+                original_prefix = stream_service.preset_running_config['systemPrefix']
+                language_map = {
+                    "zh-CN": "简体中文", "zh-TW": "繁体中文", "en": "英文", 
+                    "th": "泰语", "id": "印尼语", "vi": "越南语", 
+                    "my": "缅甸语", "es": "西班牙语", "zh": "纯中文"
+                }
+                if request.language in language_map:
+                    modified_prefix = original_prefix.replace("纯中文", language_map[request.language])
+                    stream_service.sage_controller.system_prefix = modified_prefix
+                else:
+                    stream_service.sage_controller.system_prefix = original_prefix
+            
             # 处理流式响应，传递所有参数
             async for result in stream_service.process_stream(
                 messages=messages, 
@@ -655,7 +674,8 @@ async def stream_chat(request: StreamRequest):
                 multi_agent=request.multi_agent,
                 more_suggest=request.more_suggest,
                 system_context=request.system_context,
-                available_workflows=request.available_workflows
+                available_workflows=request.available_workflows,
+                language=request.language
             ):
                 # 处理大JSON的分块传输
                 try:
