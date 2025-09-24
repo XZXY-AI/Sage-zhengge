@@ -653,16 +653,23 @@ async def stream_chat(request: StreamRequest):
             # 如果使用了preset配置且有systemPrefix，根据language参数动态替换语言
             if stream_service.preset_running_config and 'systemPrefix' in stream_service.preset_running_config:
                 original_prefix = stream_service.preset_running_config['systemPrefix']
-                language_map = {
-                    "zh-CN": "简体中文", "zh-TW": "繁体中文", "en": "英文", 
-                    "th": "泰语", "id": "印尼语", "vi": "越南语", 
-                    "my": "缅甸语", "es": "西班牙语", "zh": "纯中文"
+                
+                # 根据语言参数添加语言指令
+                language_instructions = {
+                    "en": "\n\nIMPORTANT: Please respond in English only.",
+                    "zh-CN": "\n\n重要：请用简体中文回答。",
+                    "zh-TW": "\n\n重要：請用繁體中文回答。",
+                    "zh": "\n\n重要：请用纯中文回答。",
+                    "th": "\n\nสำคัญ: กรุณาตอบเป็นภาษาไทยเท่านั้น",
+                    "id": "\n\nPENTING: Harap jawab dalam bahasa Indonesia saja.",
+                    "vi": "\n\nQUAN TRỌNG: Vui lòng chỉ trả lời bằng tiếng Việt.",
+                    "my": "\n\nအရေးကြီး- မြန်မာဘာသာဖြင့်သာ ဖြေကြားပါ။",
+                    "es": "\n\nIMPORTANTE: Por favor responde solo en español."
                 }
-                if request.language in language_map:
-                    modified_prefix = original_prefix.replace("纯中文", language_map[request.language])
-                    stream_service.sage_controller.system_prefix = modified_prefix
-                else:
-                    stream_service.sage_controller.system_prefix = original_prefix
+                language_instruction = language_instructions.get(request.language, "")
+                
+                modified_prefix = original_prefix + language_instruction
+                stream_service.sage_controller.system_prefix = modified_prefix
             
             # 处理流式响应，传递所有参数
             async for result in stream_service.process_stream(
