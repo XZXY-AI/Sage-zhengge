@@ -35,5 +35,5 @@
     ],
     "maxLoopCount": 20,
     "multiAgent": false,
-    "deepThinking": false
+    "deepThinking": true
 }
