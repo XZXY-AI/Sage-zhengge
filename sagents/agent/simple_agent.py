@@ -21,8 +21,11 @@ class SimpleAgent(AgentBase):
     """
     def __init__(self, model: Any, model_config: Dict[str, Any], system_prefix: str = ""):
         super().__init__(model, model_config, system_prefix)
-        self.TOOL_SUGGESTION_PROMPT_TEMPLATE = """你是一个智能助手，你要根据用户的需求，为用户提供帮助，回答用户的问题或者满足用户的需求。
-你要根据历史的对话以及用户的请求，获取解决用户请求用到的所有可能的工具。
+        self.TOOL_SUGGESTION_PROMPT_TEMPLATE = """你是一个工具推荐专家，你的任务是根据用户的需求，为用户推荐合适的工具。
+你要根据历史的对话以及用户的请求，以及agent的配置，获取解决用户请求用到的所有可能的工具。
+
+## agent的配置要求
+{agent_config}
 
 ## 可用工具
 {available_tools_str}
@@ -264,6 +267,7 @@ reason尽可能简单，最多20个字符
             prompt = self.TOOL_SUGGESTION_PROMPT_TEMPLATE.format(
                 session_id=session_id,
                 available_tools_str=available_tools_str,
+                agent_config=self.prepare_unified_system_message(session_id,custom_prefix=self.agent_custom_system_prefix).content,
                 messages=json.dumps(clean_messages, ensure_ascii=False, indent=2)
             )
             
